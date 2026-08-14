@@ -53,33 +53,44 @@ Files to create:
 - `src/components/MicButton.tsx` — hold-to-speak button, states, timer
 - `src/components/AnswerView.tsx` — transcript, answer, sources, audio player, timestamp
 - `src/components/NoteList.tsx` — recent notes: replay / open / delete
-- `src/lib/recorder.ts` — Web Audio PCM capture + WAV encoding, rolling windows
+- `src/lib/recorder.ts` — Web Audio PCM capture, rolling 800 ms window slicing, single WAV encode at release
+- `src/lib/transcription.ts` — `TranscriptionSession` interface + merge/dedupe logic
+- `src/lib/transcription-windowed.ts` — V1 windowed Gemini implementation of that interface
 - `src/lib/db.ts` — IndexedDB store (id, audio Blob, transcript, answer, sources, createdAt)
-- `src/lib/voice.functions.ts` — server functions: `transcribeChunk` and `answerQuestion`
+- `src/lib/voice.functions.ts` — server functions: `transcribeWindow` and `answerQuestion`
 - `src/lib/gemini.server.ts` — Gemini REST helpers (transcription + `generateContent` with `google_search` tool), reads `GEMINI_API_KEY` inside handlers
+- `src/lib/latency.ts` — dev-only timing instrumentation
 
 Files to modify:
 
 - `src/styles.css` — minimal high-contrast voice-tool palette and type scale (semantic tokens only)
 
-Environment: `GEMINI_API_KEY` stored as a project secret (I'll open the secure form). Nothing else; no Supabase config required.
+Environment: `GEMINI_API_KEY` stored as a project secret (I'll open the secure form). Server-side only — never in client JS, `VITE_` vars, IndexedDB, localStorage, or source.
+
+## Dev latency indicator
+
+A dev-only overlay (hidden in production) reports, per session: time from press to first audio frame, per-window request send time, response time and round-trip, windows sent vs. skipped, time from release to answer, and total answer latency. This is what verifies words really appear while speaking.
 
 ## Error handling
 
 Distinct, human-readable messages with retry for: permission denied, no microphone, unsupported browser (no `getUserMedia`/AudioContext), empty/silent recording, transcription failure, model/grounding failure, network offline, rate limit or quota errors from Gemini.
 
-## Build order
+## Build order — with a hard checkpoint
 
 1. UI shell and mobile layout
 2. Hold-to-talk capture + timer + states
-3. Streaming transcription wiring
-4. Recording persistence
-5. Grounded answer + sources
-6. IndexedDB history
-7. Error handling and polish
+3. Windowed transcription wiring + latency indicator
+4. **STOP AND TEST:** hold the button, speak continuously for ~10 s, confirm words appear repeatedly during speech (not only on release); release and confirm exactly one grounded answer request and that sources appear. Do not proceed until this passes.
+5. Recording persistence (single blob)
+6. Grounded answer + source display
+7. IndexedDB history (replay / open / delete)
+8. Error handling and polish
 
 ## Known limitations
 
-- Live transcription is windowed, not a true Gemini Live socket session (key security).
+- V1 is near-live windowed transcription, not Gemini Live API streaming; a server-side WebSocket relay is the documented upgrade path.
+- Transcript updates land roughly once per second, not per word.
+- Word boundaries at window edges can occasionally merge imperfectly.
 - Desktop hold-to-speak uses pointer events; both mouse and touch supported.
 - History is per-device and cleared if the browser wipes storage.
+
