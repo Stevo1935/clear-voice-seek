@@ -119,6 +119,6 @@ export async function answerWithSearch(
     answer: textOf(json),
     sources,
     searched: (meta?.webSearchQueries?.length ?? 0) > 0 || sources.length > 0,
-    groundingUnavailable,
+
   };
 }
