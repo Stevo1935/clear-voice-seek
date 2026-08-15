@@ -85,10 +85,8 @@ export async function answerWithSearch(
   answer: string;
   sources: GroundingSource[];
   searched: boolean;
-  groundingUnavailable?: boolean;
 }> {
   let json: GeminiResponse;
-  let groundingUnavailable = false;
   try {
     json = await callGemini(MODEL, apiKey, {
       contents: [{ role: "user", parts: [{ text: question }] }],
@@ -97,17 +95,15 @@ export async function answerWithSearch(
       generationConfig: { temperature: 0.2, maxOutputTokens: 512 },
     });
   } catch (error) {
-    // Google Search grounding needs quota the API key may not have (429/403/404).
-    // Fall back to an ungrounded answer instead of failing the whole request.
+    // Google Search grounding requires quota/billing the API key may not have.
+    // Never silently answer without the web — surface it to the user instead.
     const status = (error as { status?: number }).status;
-    if (status !== 429 && status !== 403 && status !== 404) throw error;
-    groundingUnavailable = true;
-    json = await callGemini(MODEL, apiKey, {
-      contents: [{ role: "user", parts: [{ text: question }] }],
-      systemInstruction: ANSWER_SYSTEM_INSTRUCTION,
-      generationConfig: { temperature: 0.2, maxOutputTokens: 512 },
-    });
+    if (status === 429 || status === 403 || status === 404) {
+      throw new Error("GROUNDING_UNAVAILABLE");
+    }
+    throw error;
   }
+
 
   const meta = json.candidates?.[0]?.groundingMetadata;
   const seen = new Set<string>();
@@ -123,6 +119,6 @@ export async function answerWithSearch(
     answer: textOf(json),
     sources,
     searched: (meta?.webSearchQueries?.length ?? 0) > 0 || sources.length > 0,
-    groundingUnavailable,
+
   };
 }
