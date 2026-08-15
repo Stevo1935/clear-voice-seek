@@ -157,6 +157,14 @@ function VoiceSearch() {
       const result = await answerQuestion({ data: { question } });
       trackerRef.current?.markAnswer(performance.now() - startedAt);
 
+      if (!result.ok) {
+        setState("error");
+        setError("Live web search is currently unavailable. Please try again.");
+        return;
+      }
+
+
+
       const note: VoiceNote = {
         id:
           globalThis.crypto?.randomUUID?.() ??

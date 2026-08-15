@@ -77,15 +77,12 @@ const ANSWER_SYSTEM_INSTRUCTION = {
   ],
 };
 
+export type AnswerResult =
+  | { ok: true; answer: string; sources: GroundingSource[]; searched: boolean }
+  | { ok: false; reason: "GROUNDING_UNAVAILABLE" };
+
 /** One grounded answer for one completed question. */
-export async function answerWithSearch(
-  apiKey: string,
-  question: string,
-): Promise<{
-  answer: string;
-  sources: GroundingSource[];
-  searched: boolean;
-}> {
+export async function answerWithSearch(apiKey: string, question: string): Promise<AnswerResult> {
   let json: GeminiResponse;
   try {
     json = await callGemini(MODEL, apiKey, {
@@ -96,13 +93,15 @@ export async function answerWithSearch(
     });
   } catch (error) {
     // Google Search grounding requires quota/billing the API key may not have.
-    // Never silently answer without the web — surface it to the user instead.
+    // Never silently answer without the web — report it as a normal result so
+    // the UI can show a message instead of the app crashing on a thrown error.
     const status = (error as { status?: number }).status;
     if (status === 429 || status === 403 || status === 404) {
-      throw new Error("GROUNDING_UNAVAILABLE");
+      return { ok: false, reason: "GROUNDING_UNAVAILABLE" };
     }
     throw error;
   }
+
 
 
   const meta = json.candidates?.[0]?.groundingMetadata;
@@ -116,6 +115,8 @@ export async function answerWithSearch(
   }
 
   return {
+    ok: true,
+
     answer: textOf(json),
     sources,
     searched: (meta?.webSearchQueries?.length ?? 0) > 0 || sources.length > 0,
