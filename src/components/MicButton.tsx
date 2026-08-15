@@ -20,9 +20,14 @@ export function MicButton({ state, elapsedMs, onHoldStart, onHoldEnd }: MicButto
 
   const start = (e: ReactPointerEvent<HTMLButtonElement>) => {
     if (busy) return;
-    e.currentTarget.setPointerCapture?.(e.pointerId);
+    try {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    } catch {
+      /* pointer capture is best-effort; never block recording */
+    }
     onHoldStart();
   };
+
   const end = () => {
     if (recording) onHoldEnd();
   };
