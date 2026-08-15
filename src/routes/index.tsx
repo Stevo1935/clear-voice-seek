@@ -48,9 +48,13 @@ function errorMessage(error: unknown): string {
     return "This browser can't record audio. Try Chrome or Safari.";
   const message = error instanceof Error ? error.message : String(error);
   if (!navigator.onLine) return "You appear to be offline. Reconnect and try again.";
+  if (/GROUNDING_UNAVAILABLE/.test(message))
+    return "Live web search is currently unavailable. Please try again.";
   if (/\[429\]/.test(message)) return "Too many requests right now. Wait a moment and try again.";
   if (/\[4\d\d\]/.test(message)) return "The request was rejected. Please try again.";
+  if (/not configured/i.test(message)) return message;
   return "Something went wrong. Please try again.";
+
 }
 
 function VoiceSearch() {
